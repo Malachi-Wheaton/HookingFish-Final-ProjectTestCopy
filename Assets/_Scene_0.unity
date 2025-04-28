@@ -6911,20 +6911,28 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 253257552, guid: a872466d61ad54863b565d8b4a97f085, type: 3}
+      propertyPath: maxPitch
+      value: 60
+      objectReference: {fileID: 0}
+    - target: {fileID: 253257552, guid: a872466d61ad54863b565d8b4a97f085, type: 3}
+      propertyPath: minPitch
+      value: -60
+      objectReference: {fileID: 0}
+    - target: {fileID: 253257552, guid: a872466d61ad54863b565d8b4a97f085, type: 3}
       propertyPath: yawSpeed
-      value: 260
+      value: 400
       objectReference: {fileID: 0}
     - target: {fileID: 253257552, guid: a872466d61ad54863b565d8b4a97f085, type: 3}
       propertyPath: jumpSpeed
-      value: 2
+      value: 4
       objectReference: {fileID: 0}
     - target: {fileID: 253257552, guid: a872466d61ad54863b565d8b4a97f085, type: 3}
       propertyPath: moveSpeed
-      value: 2
+      value: 4
       objectReference: {fileID: 0}
     - target: {fileID: 253257552, guid: a872466d61ad54863b565d8b4a97f085, type: 3}
       propertyPath: pitchSpeed
-      value: 260
+      value: 400
       objectReference: {fileID: 0}
     - target: {fileID: 3739151138451514558, guid: a872466d61ad54863b565d8b4a97f085, type: 3}
       propertyPath: m_Name
