@@ -39,7 +39,7 @@ public class FirstPersonController : MonoBehaviour
         velo *= moveSpeed;
 
         //set the jump
-        velo.y = rb.velocity.y;
+        velo.y = rb.linearVelocity.y;
 
         //if (Input.GetKeyDown(KeyCode.Space) &&
         //    //Physics.CheckSphere(groundReference.position, .04f))
@@ -49,7 +49,7 @@ public class FirstPersonController : MonoBehaviour
         }
 
         //apply movement
-        rb.velocity = velo;
+        rb.linearVelocity = velo;
 
         //apply rotation
         transform.localEulerAngles += new Vector3(
