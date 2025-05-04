@@ -1,29 +1,24 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using TMPro;
 
-public class PlayerMovementAdvanced : MonoBehaviour
+public class AdvancedFirstPersonController : MonoBehaviour
 {
-    public bool wallrunning;
-    public bool sliding;
-
     [Header("Movement")]
     private float moveSpeed;
-    public float walkSpeed;
-    public float sprintSpeed;
-
-    public float groundDrag;
+    public float walkSpeed = 4f;
+    public float sprintSpeed = 6f;
+    public float groundDrag = 5f;
 
     [Header("Jumping")]
-    public float jumpForce;
-    public float jumpCooldown;
-    public float airMultiplier;
-    bool readyToJump;
+    public float jumpForce = 10f;
+    public float jumpCooldown = 0.25f;
+    public float airMultiplier = 0.4f;
+    private bool readyToJump;
 
     [Header("Crouching")]
-    public float crouchSpeed;
-    public float crouchYScale;
+    public float crouchSpeed = 2f;
+    public float crouchYScale = 0.5f;
     private float startYScale;
 
     [Header("Keybinds")]
@@ -32,33 +27,36 @@ public class PlayerMovementAdvanced : MonoBehaviour
     public KeyCode crouchKey = KeyCode.LeftControl;
 
     [Header("Ground Check")]
-    public float playerHeight;
+    public float playerHeight = 2f;
     public LayerMask whatIsGround;
-    bool grounded;
+    private bool grounded;
 
     [Header("Slope Handling")]
-    public float maxSlopeAngle;
+    public float maxSlopeAngle = 45f;
     private RaycastHit slopeHit;
     private bool exitingSlope;
 
+    [Header("Camera Settings")]
+    public float yawSpeed = 260f;
+    public float pitchSpeed = 260f;
+    public float minPitch = -45f;
+    public float maxPitch = 45f;
+    private Transform cameraTransform;
 
+    [Header("References")]
     public Transform orientation;
 
     float horizontalInput;
     float verticalInput;
-
     Vector3 moveDirection;
 
-    Rigidbody rb;
+    private Rigidbody rb;
 
+    public enum MovementState { walking, sprinting, crouching, air }
     public MovementState state;
-    public enum MovementState
-    {
-        walking,
-        sprinting,
-        crouching,
-        air
-    }
+
+    [HideInInspector]
+    public bool sliding; 
 
     private void Start()
     {
@@ -66,24 +64,24 @@ public class PlayerMovementAdvanced : MonoBehaviour
         rb.freezeRotation = true;
 
         readyToJump = true;
-
         startYScale = transform.localScale.y;
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
+        cameraTransform = GetComponentInChildren<Camera>().transform;
     }
 
     private void Update()
     {
-        // ground check
         grounded = Physics.Raycast(transform.position, Vector3.down, playerHeight * 0.5f + 0.2f, whatIsGround);
 
         MyInput();
         SpeedControl();
         StateHandler();
+        HandleLook();
 
-        // handle drag
-        if (grounded)
-            rb.linearDamping = groundDrag;
-        else
-            rb.linearDamping = 0;
+        rb.linearDamping = grounded ? groundDrag : 0f;
     }
 
     private void FixedUpdate()
@@ -96,24 +94,19 @@ public class PlayerMovementAdvanced : MonoBehaviour
         horizontalInput = Input.GetAxisRaw("Horizontal");
         verticalInput = Input.GetAxisRaw("Vertical");
 
-        // when to jump
         if (Input.GetKey(jumpKey) && readyToJump && grounded)
         {
             readyToJump = false;
-
             Jump();
-
             Invoke(nameof(ResetJump), jumpCooldown);
         }
 
-        // start crouch
         if (Input.GetKeyDown(crouchKey))
         {
             transform.localScale = new Vector3(transform.localScale.x, crouchYScale, transform.localScale.z);
             rb.AddForce(Vector3.down * 5f, ForceMode.Impulse);
         }
 
-        // stop crouch
         if (Input.GetKeyUp(crouchKey))
         {
             transform.localScale = new Vector3(transform.localScale.x, startYScale, transform.localScale.z);
@@ -122,28 +115,27 @@ public class PlayerMovementAdvanced : MonoBehaviour
 
     private void StateHandler()
     {
-        // Mode - Crouching
+        if (sliding)
+        {
+            moveSpeed = sprintSpeed; 
+            return;
+        }
+
         if (Input.GetKey(crouchKey))
         {
             state = MovementState.crouching;
             moveSpeed = crouchSpeed;
         }
-
-        // Mode - Sprinting
         else if (grounded && Input.GetKey(sprintKey))
         {
             state = MovementState.sprinting;
             moveSpeed = sprintSpeed;
         }
-
-        // Mode - Walking
         else if (grounded)
         {
             state = MovementState.walking;
             moveSpeed = walkSpeed;
         }
-
-        // Mode - Air
         else
         {
             state = MovementState.air;
@@ -152,45 +144,36 @@ public class PlayerMovementAdvanced : MonoBehaviour
 
     private void MovePlayer()
     {
-        // calculate movement direction
         moveDirection = orientation.forward * verticalInput + orientation.right * horizontalInput;
 
-        // on slope
         if (OnSlope() && !exitingSlope)
         {
             rb.AddForce(GetSlopeMoveDirection() * moveSpeed * 20f, ForceMode.Force);
-
             if (rb.linearVelocity.y > 0)
                 rb.AddForce(Vector3.down * 80f, ForceMode.Force);
         }
-
-        // on ground
         else if (grounded)
+        {
             rb.AddForce(moveDirection.normalized * moveSpeed * 10f, ForceMode.Force);
-
-        // in air
-        else if (!grounded)
+        }
+        else
+        {
             rb.AddForce(moveDirection.normalized * moveSpeed * 10f * airMultiplier, ForceMode.Force);
+        }
 
-        // turn gravity off while on slope
         rb.useGravity = !OnSlope();
     }
 
     private void SpeedControl()
     {
-        // limiting speed on slope
         if (OnSlope() && !exitingSlope)
         {
             if (rb.linearVelocity.magnitude > moveSpeed)
                 rb.linearVelocity = rb.linearVelocity.normalized * moveSpeed;
         }
-
-        // limiting speed on ground or in air
         else
         {
             Vector3 flatVel = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
-
-            // limit velocity if needed
             if (flatVel.magnitude > moveSpeed)
             {
                 Vector3 limitedVel = flatVel.normalized * moveSpeed;
@@ -202,18 +185,16 @@ public class PlayerMovementAdvanced : MonoBehaviour
     private void Jump()
     {
         exitingSlope = true;
-
-        // reset y velocity
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
-
         rb.AddForce(transform.up * jumpForce, ForceMode.Impulse);
     }
+
     private void ResetJump()
     {
         readyToJump = true;
-
         exitingSlope = false;
     }
+
 
     public bool OnSlope()
     {
@@ -222,21 +203,37 @@ public class PlayerMovementAdvanced : MonoBehaviour
             float angle = Vector3.Angle(Vector3.up, slopeHit.normal);
             return angle < maxSlopeAngle && angle != 0;
         }
-
         return false;
     }
 
-    // Original no-argument version
-    public Vector3 GetSlopeMoveDirection()
+
+    private Vector3 GetSlopeMoveDirection()
     {
         return Vector3.ProjectOnPlane(moveDirection, slopeHit.normal).normalized;
     }
 
-    // New version with argument
-    public Vector3 GetSlopeMoveDirection(Vector3 direction)
+    public Vector3 GetSlopeMoveDirection(Vector3 inputDirection)
     {
-        return Vector3.ProjectOnPlane(direction, slopeHit.normal).normalized;
+        return Vector3.ProjectOnPlane(inputDirection, slopeHit.normal).normalized;
     }
 
+    private void HandleLook()
+    {
+        float yaw = Input.GetAxis("Mouse X") * yawSpeed * Time.deltaTime;
+        float pitch = -Input.GetAxis("Mouse Y") * pitchSpeed * Time.deltaTime;
 
+        transform.Rotate(Vector3.up * yaw);
+
+        float newPitch = cameraTransform.localEulerAngles.x + pitch;
+        newPitch = NormalizeAngle(newPitch);
+        newPitch = Mathf.Clamp(newPitch, minPitch, maxPitch);
+
+        cameraTransform.localEulerAngles = new Vector3(newPitch, cameraTransform.localEulerAngles.y, 0f);
+    }
+
+    private float NormalizeAngle(float angle)
+    {
+        return angle > 180 ? angle - 360 : angle;
+    }
 }
+
